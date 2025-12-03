@@ -1,0 +1,43 @@
+{
+  "name": "backend-apps",
+  "version": "1.0.0",
+  "description": "Bun native backend starter (no framework)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src/app.ts",
+    "build": "bun build src/app.ts --outdir dist",
+    "start": "bun run dist/app.js",
+    "prisma:generate": "bunx prisma generate",
+    "prisma:migrate": "bunx prisma migrate dev",
+    "format": "prettier --write src/"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.0.1",
+    "@prisma/client": "^7.0.1",
+    "bcryptjs": "^2.4.3",
+    "cookie": "^1.0.2",
+    "dotenv": "^16.0.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "^3.6.2",
+    "prisma": "^7.0.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "compilerOptions": {
+    "typeRoots": [
+      "./src/types",
+      "./node_modules/@types"
+    ],
+    "strict": true
+  }
+}

@@ -1,0 +1,288 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CardType {
+  TASK
+  BUG
+  FEATURE
+  CHORE
+}
+
+model User {
+  id         String    @id @default(uuid())
+  email      String    @unique
+  password   String
+  name       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tokens        RefreshToken[]
+  assignedCards Card[]   @relation("AssigneeCards")
+  comments      CardComment[]
+  attachments   Attachment[]
+  activities    Activity[]
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Project {
+  id          String          @id @default(uuid())
+  key         String          @unique
+  name        String
+  description String?
+  archived    Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  settings    ProjectSettings?
+  activities  Activity[]
+  boards      Board[]
+  workflows   ProjectWorkflow[]
+  cards       Card[]
+}
+
+model ProjectSettings {
+  id        String   @id @default(uuid())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String   @unique
+  config    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Master workflow templates
+model Workflow {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  isDefault   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  stages      WorkflowStage[]
+  projectUses ProjectWorkflow[]
+}
+
+model WorkflowStage {
+  id          String    @id @default(uuid())
+  workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowId  String
+
+  key         String
+  name        String
+  description String?
+  color       String?
+  isDone      Boolean   @default(false)
+  position    Int       @default(0)
+  meta        Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  parentStage   WorkflowStage?  @relation("WorkflowStageCopy", fields: [parentStageId], references: [id])
+  parentStageId String?
+  copies        WorkflowStage[] @relation("WorkflowStageCopy")
+
+  projectStages ProjectWorkflowStage[]
+}
+
+
+model ProjectWorkflow {
+  id          String   @id @default(uuid())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Restrict)
+  workflowId  String
+  name        String
+  config      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stages ProjectWorkflowStage[]
+}
+
+model ProjectWorkflowStage {
+  id                  String           @id @default(uuid())
+  projectWorkflow     ProjectWorkflow  @relation(fields: [projectWorkflowId], references: [id], onDelete: Cascade)
+  projectWorkflowId   String
+
+  // optional reference back to master workflow stage
+  workflowStage       WorkflowStage?   @relation(fields: [workflowStageId], references: [id])
+  workflowStageId     String?
+
+  name      String
+  key       String
+  description String?
+  color     String?
+  isDone    Boolean  @default(false)
+  position  Int      @default(0)
+  config    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  columns BoardColumn[]
+  cards   Card[]
+}
+
+model Board {
+  id          String   @id @default(uuid())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  name        String
+  description String?
+  config      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  columns BoardColumn[]
+  cards   Card[]
+}
+
+model BoardColumn {
+  id                     String               @id @default(uuid())
+  board                  Board                @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId                String
+
+  projectWorkflowStage   ProjectWorkflowStage? @relation(fields: [projectWorkflowStageId], references: [id], onDelete: SetNull)
+  projectWorkflowStageId String?
+
+  name        String
+  description String?
+  position    Int      @default(0)
+  wipLimit    Int?
+  meta        Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  cards Card[]
+}
+
+model Card {
+  id            String    @id @default(uuid())
+  board         Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId       String
+
+  column        BoardColumn? @relation(fields: [columnId], references: [id], onDelete: SetNull)
+  columnId      String?
+
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId     String
+
+  title         String
+  description   String?
+  type          CardType  @default(TASK)
+  priority      Priority  @default(MEDIUM)
+
+  assignee      User?     @relation("AssigneeCards", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigneeId    String?
+
+  dueDate       DateTime?
+  position      Float     @default(0)
+  archived      Boolean   @default(false)
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  projectWorkflowStage   ProjectWorkflowStage? @relation(fields: [projectWorkflowStageId], references: [id], onDelete: SetNull)
+  projectWorkflowStageId String?
+
+  tags        CardTag[]
+  comments    CardComment[]
+  attachments Attachment[]
+  activities  Activity[]
+
+  @@index([projectId])
+  @@index([boardId, columnId])
+}
+
+model CardTag {
+  id        String  @id @default(uuid())
+  card      Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId    String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+
+  @@unique([cardId, name])
+}
+
+model CardComment {
+  id        String   @id @default(uuid())
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId    String
+
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId  String?
+
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Attachment {
+  id           String   @id @default(uuid())
+  url          String
+  fileName     String?
+  fileSize     Int?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedById String?
+  card         Card?    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId       String?
+  createdAt    DateTime @default(now())
+}
+
+model Activity {
+  id         String  @id @default(uuid())
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId  String
+
+  user       User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId     String?
+
+  card       Card?   @relation(fields: [cardId], references: [id])
+  cardId     String?
+
+  type       String
+  payload    Json?
+  createdAt  DateTime @default(now())
+}
+
+model AutomationRule {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  event       String
+  conditions  Json
+  actions     Json
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId, event])
+}
